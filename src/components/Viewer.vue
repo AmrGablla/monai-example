@@ -26,16 +26,9 @@ import {
 } from "@cornerstonejs/core";
 import cornerstoneDICOMImageLoader from "@cornerstonejs/dicom-image-loader";
 import * as cornerstoneTools from "@cornerstonejs/tools";
-// import SegmentationReader from "@/monai/SegmentationReader";
-// import {
-//   createSegment,
-//   updateSegment,
-//   getLabelMaps,
-//   flattenLabelmaps,
-// } from "@/monai/SegmentationUtils";
-// import { getLabelColor } from "@/monai/GenericUtils";
 import { prefetchMetadataInformation } from "../helpers/convertMultiframeImageIds";
-import initDemo from "../helpers/initDemo";
+import initDemo from "../helpers/initDemo"; 
+import SegmentationReader from "@/monai/SegmentationReader";
 
 export default {
   name: "ViewerComponent",
@@ -51,6 +44,7 @@ export default {
       imageIds: [],
       renderingEngineId: "myRenderingEngine",
       volumeId: "cornerstoneStreamingImageVolume:CT_VOLUME_ID",
+      segmentationId: "MY_SEGMENTATION_ID",
       labels: {
         pancreas: 1,
         "pancreatic tumor": 2,
@@ -64,25 +58,13 @@ export default {
       this.toolGroupId
     );
     cornerstoneTools.addTool(cornerstoneTools.StackScrollMouseWheelTool);
+    this.toolGroup.addTool(cornerstoneTools.SegmentationDisplayTool.toolName);
+    this.toolGroup.setToolEnabled(
+      cornerstoneTools.SegmentationDisplayTool.toolName
+    );
+
     this.toolGroup.addTool(cornerstoneTools.StackScrollMouseWheelTool.toolName);
-    this.toolGroup.addTool(cornerstoneTools.BrushTool, {
-      name: "BrushEraser",
-      configuration: {
-        alwaysEraseOnClick: true,
-      },
-    });
-    this.toolGroup.addTool(cornerstoneTools.CircleScissorsTool, {
-      name: "CircleScissorsEraser",
-      defaultStrategy: "ERASE_INSIDE",
-    });
-    this.toolGroup.addTool(cornerstoneTools.FreehandScissorsTool, {
-      name: "FreehandScissorsEraser",
-      defaultStrategy: "ERASE_INSIDE",
-    });
-    this.toolGroup.addTool(cornerstoneTools.RectangleScissorsTool, {
-      name: "RectangleScissorsEraser",
-      defaultStrategy: "ERASE_INSIDE",
-    });
+
     this.toolGroup.setToolActive(
       cornerstoneTools.StackScrollMouseWheelTool.toolName
     );
@@ -111,95 +93,112 @@ export default {
     this.element = element;
   },
   methods: {
-    // refreshSegTable(id) {
-    //   const element = this.element;
+    async newSegmentation() {},
+    async addSegmentationsToState(file, labels) {
+      const parsedFile = await SegmentationReader.parseNrrdData(file);
+      console.log(labels);
+      console.log(parsedFile);
+      // Create a segmentation of the same resolution as the source data
+      // using volumeLoader.createAndCacheDerivedVolume.
+      const segmentationVolume = await volumeLoader.createAndCacheDerivedVolume(
+        this.volumeId,
+        {
+          volumeId: this.segmentationId,
+        }
+      );
 
-    //   const labelmaps = getLabelMaps(element);
-    //   const segments = flattenLabelmaps(labelmaps);
-    //   if (!segments.length) {
-    //     id = undefined;
-    //   } else if (!id) {
-    //     id = segments[segments.length - 1].id;
-    //   }
+      // Add the segmentations to state
+      cornerstoneTools.segmentation.addSegmentations([
+        {
+          segmentationId: this.segmentationId,
+          representation: {
+            // The type of segmentation
+            type: cornerstoneTools.Enums.SegmentationRepresentations.Labelmap,
+            // The actual segmentation data, in the case of labelmap this is a
+            // reference to the source volume of the segmentation.
+            data: {
+              volumeId: this.segmentationId,
+            },
+          },
+        },
+      ]);
 
-    //   // do not select if index is from a scribbles volume
-    //   // scribbles volumes exist in table
-    //   // but wont be shown or selectable through the table ui
-    //   for (let i = 0; i < segments.length; i++) {
-    //     if (
-    //       segments[i].meta.SegmentLabel.includes("scribbles") &&
-    //       segments[i].id == id
-    //     ) {
-    //       id = null;
-    //       break;
-    //     }
-    //   }
-    // },
-    // async onSegmentation(
-    //   file,
-    //   labels,
-    //   operation,
-    //   slice,
-    //   overlap,
-    //   selectedIndex = 0
-    // ) {
-    //   // if (!selectedIndex) {
-    //   //   selectedIndex = this.getSelectedActiveIndex();
-    //   // }
-    //   const { image } = SegmentationReader.parseNrrdData(file);
+      // Add some data to the segmentations
+      this.createSegmentation(segmentationVolume);
 
-    //   if (labels) {
-    //     let i = 0;
-    //     for (var label in labels) {
-    //       if (Array.isArray(labels)) {
-    //         label = labels[label];
-    //       }
+      await cornerstoneTools.segmentation.addSegmentationRepresentations(
+        this.toolGroupId,
+        [
+          {
+            segmentationId: this.segmentationId,
+            type: cornerstoneTools.Enums.SegmentationRepresentations.Labelmap,
+          },
+        ]
+      );
+    },
+    createSegmentation(segmentationVolume) {
+      console.log(segmentationVolume);
+      // const numberOfFrames = 30;
+      // for (let i = 0; i < numberOfFrames; i++) {
+      //   if (slice >= 0 && i !== slice) {
+      //     // do only one slice (in case of 3D Volume but 2D result e.g. Deeprow2D)
+      //     continue;
+      //   }
 
-    //       if (label === "background") {
-    //         console.debug("Ignore Background...");
-    //         continue;
-    //       }
-    //       const resp = createSegment(
-    //         this.element,
-    //         label,
-    //         "",
-    //         getLabelColor(label),
-    //         // true
-    //         i === 0 ? !overlap : false
-    //       );
-    //       if (i === 0) {
-    //         selectedIndex = resp;
-    //       }
-    //       i++;
-    //     }
-    //   }
+      //   // no segments in this slice
+      //   if (
+      //     !labelmaps2D[i] ||
+      //     !labelmaps2D[i].segmentsOnLabelmap ||
+      //     !labelmaps2D[i].segmentsOnLabelmap.length
+      //   ) {
+      //     operation = "override";
+      //   }
 
-    //   if (!operation && overlap) {
-    //     operation = "overlap";
-    //   }
+      //   const sliceOffset = slicelengthInBytes * i;
+      //   const sliceLength = slicelengthInBytes / 2;
 
-    //   updateSegment(
-    //     this.element,
-    //     selectedIndex.labelmapIndex,
-    //     selectedIndex.segmentIndex,
-    //     image,
-    //     this.numberOfFrames,
-    //     operation,
-    //     slice
-    //   );
-    // },
-    // async handleSegFileChange(e) {
-    //   try {
-    //     const file = e.target.files[0];
-    //     const reader = new FileReader();
-    //     reader.onloadend = async (event) => {
-    //       await this.onSegmentation(event.target.result, this.labels);
-    //     };
-    //     reader.readAsArrayBuffer(file);
-    //   } catch (err) {
-    //     console.log(err);
-    //   }
-    // },
+      //   let pixelData = new Uint16Array(buffer, sliceOffset, sliceLength);
+      //   let srcPixelData = new Uint16Array(srcBuffer, sliceOffset, sliceLength);
+
+      //   if (operation === "overlap" || operation === "override") {
+      //     useSourceBuffer = true;
+      //   }
+
+      //   for (let j = 0; j < pixelData.length; j++) {
+      //     if (operation === "overlap") {
+      //       if (pixelData[j] > 0) {
+      //         srcPixelData[j] = pixelData[j] + segmentOffset;
+      //       }
+      //     } else if (operation === "override") {
+      //       if (srcPixelData[j] === segmentIndex) {
+      //         srcPixelData[j] = 0;
+      //       }
+      //       if (pixelData[j] > 0) {
+      //         srcPixelData[j] = pixelData[j] + segmentOffset;
+      //       }
+      //     } else {
+      //       if (pixelData[j] > 0) {
+      //         pixelData[j] = pixelData[j] + segmentOffset;
+      //       }
+      //     }
+      //   }
+
+      //   pixelData = useSourceBuffer ? srcPixelData : pixelData;
+      //   labelmaps2D[i] = { pixelData, segmentsOnLabelmap };
+      // }
+    },
+    async handleSegFileChange(e) {
+      try {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onloadend = async (event) => {
+          await this.addSegmentationsToState(event.target.result, this.labels);
+        };
+        reader.readAsArrayBuffer(file);
+      } catch (err) {
+        console.log(err);
+      }
+    },
     handleFileChange(e) {
       // Create a ORTHOGRAPHIC viewport
       const viewportInput = {
