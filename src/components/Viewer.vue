@@ -23,13 +23,16 @@ import {
   setVolumesForViewports,
   Enums,
   volumeLoader,
+  metaData,
 } from "@cornerstonejs/core";
+import { adaptersSEG } from "@cornerstonejs/adapters";
 import cornerstoneDICOMImageLoader from "@cornerstonejs/dicom-image-loader";
 import * as cornerstoneTools from "@cornerstonejs/tools";
 import { prefetchMetadataInformation } from "../helpers/convertMultiframeImageIds";
-import initDemo from "../helpers/initDemo"; 
+import initDemo from "../helpers/initDemo";
 import SegmentationReader from "@/monai/SegmentationReader";
 
+const { Cornerstone3D } = adaptersSEG;
 export default {
   name: "ViewerComponent",
   data() {
@@ -58,6 +61,7 @@ export default {
       this.toolGroupId
     );
     cornerstoneTools.addTool(cornerstoneTools.StackScrollMouseWheelTool);
+    cornerstoneTools.addTool(cornerstoneTools.SegmentationDisplayTool);
     this.toolGroup.addTool(cornerstoneTools.SegmentationDisplayTool.toolName);
     this.toolGroup.setToolEnabled(
       cornerstoneTools.SegmentationDisplayTool.toolName
@@ -93,8 +97,7 @@ export default {
     this.element = element;
   },
   methods: {
-    async newSegmentation() {},
-    async addSegmentationsToState(file, labels) {
+    async  addSegmentationsToState(file, labels) {
       const parsedFile = await SegmentationReader.parseNrrdData(file);
       console.log(labels);
       console.log(parsedFile);
@@ -124,7 +127,7 @@ export default {
       ]);
 
       // Add some data to the segmentations
-      this.createSegmentation(segmentationVolume);
+      this.createSegmentation(segmentationVolume, parsedFile);
 
       await cornerstoneTools.segmentation.addSegmentationRepresentations(
         this.toolGroupId,
@@ -135,57 +138,21 @@ export default {
           },
         ]
       );
+      this.renderingEngine.renderViewport(this.viewportId);
     },
-    createSegmentation(segmentationVolume) {
+    createSegmentation(segmentationVolume, nrrdBuffer) {
+      console.log(" Cornerstone3D.Segmentation");
+      console.log(Cornerstone3D.Segmentation);
+      const { labelmapBufferArray, segMetadata, segmentsOnFrame } =
+        Cornerstone3D.Segmentation.generateToolState(
+          this.imageIds,
+          nrrdBuffer,
+          metaData
+        );
+      console.log(labelmapBufferArray);
+      console.log(segMetadata);
+      console.log(segmentsOnFrame);
       console.log(segmentationVolume);
-      // const numberOfFrames = 30;
-      // for (let i = 0; i < numberOfFrames; i++) {
-      //   if (slice >= 0 && i !== slice) {
-      //     // do only one slice (in case of 3D Volume but 2D result e.g. Deeprow2D)
-      //     continue;
-      //   }
-
-      //   // no segments in this slice
-      //   if (
-      //     !labelmaps2D[i] ||
-      //     !labelmaps2D[i].segmentsOnLabelmap ||
-      //     !labelmaps2D[i].segmentsOnLabelmap.length
-      //   ) {
-      //     operation = "override";
-      //   }
-
-      //   const sliceOffset = slicelengthInBytes * i;
-      //   const sliceLength = slicelengthInBytes / 2;
-
-      //   let pixelData = new Uint16Array(buffer, sliceOffset, sliceLength);
-      //   let srcPixelData = new Uint16Array(srcBuffer, sliceOffset, sliceLength);
-
-      //   if (operation === "overlap" || operation === "override") {
-      //     useSourceBuffer = true;
-      //   }
-
-      //   for (let j = 0; j < pixelData.length; j++) {
-      //     if (operation === "overlap") {
-      //       if (pixelData[j] > 0) {
-      //         srcPixelData[j] = pixelData[j] + segmentOffset;
-      //       }
-      //     } else if (operation === "override") {
-      //       if (srcPixelData[j] === segmentIndex) {
-      //         srcPixelData[j] = 0;
-      //       }
-      //       if (pixelData[j] > 0) {
-      //         srcPixelData[j] = pixelData[j] + segmentOffset;
-      //       }
-      //     } else {
-      //       if (pixelData[j] > 0) {
-      //         pixelData[j] = pixelData[j] + segmentOffset;
-      //       }
-      //     }
-      //   }
-
-      //   pixelData = useSourceBuffer ? srcPixelData : pixelData;
-      //   labelmaps2D[i] = { pixelData, segmentsOnLabelmap };
-      // }
     },
     async handleSegFileChange(e) {
       try {
@@ -238,7 +205,7 @@ export default {
         [this.viewportId]
       );
 
-      this.renderingEngine.renderViewport(this.imageIds);
+      this.renderingEngine.renderViewport(this.viewportId);
     },
   },
 };

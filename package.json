@@ -8,6 +8,7 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "@cornerstonejs/adapters": "^1.13.1",
     "@cornerstonejs/core": "^1.13.0",
     "@cornerstonejs/dicom-image-loader": "^1.13.0",
     "@cornerstonejs/streaming-image-volume-loader": "^1.13.0",
